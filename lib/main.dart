@@ -337,12 +337,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).toList();
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
         backgroundColor: cream,
         surfaceTintColor: cream,
-        title: const Text(
-          'Rupa Rempah',
-          style: TextStyle(fontWeight: FontWeight.w700, color: ink),
+        title: Semantics(
+          label: 'Rupa Rempah',
+          image: true,
+          child: const Icon(
+            Icons.spa_rounded,
+            color: leaf,
+            size: 29,
+          ),
         ),
         actions: [
           IconButton(
@@ -449,49 +455,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
       bottomNavigationBar: ListenableBuilder(
         listenable: catalog,
         builder: (context, _) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: GestureDetector(
-                onTap: catalog.itemCount == 0
-                    ? null
-                    : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PaymentScreen(catalog: catalog),
-                          ),
-                        ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: catalog.itemCount == 0
-                        ? const Color(0xFFD8DED5)
-                        : leaf,
+          return Material(
+            color: Colors.transparent,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: Semantics(
+                  button: catalog.itemCount > 0,
+                  label: catalog.itemCount == 0
+                      ? 'Total jual belum ada produk'
+                      : 'Buka pembayaran, total ${formatRupiah(catalog.total)}',
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.shopping_bag_outlined, color: Colors.white),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          catalog.itemCount == 0
-                              ? 'Total Jual: belum ada produk'
-                              : 'Total Jual (${catalog.itemCount} item)',
-                          style: const TextStyle(
+                    onTap: catalog.itemCount == 0
+                        ? null
+                        : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PaymentScreen(catalog: catalog),
+                              ),
+                            ),
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: catalog.itemCount == 0
+                            ? const Color(0xFFD8DED5)
+                            : leaf,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.shopping_bag_outlined,
                             color: Colors.white,
-                            fontWeight: FontWeight.w600,
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              catalog.itemCount == 0
+                                  ? 'Total Jual: belum ada produk'
+                                  : 'Total Jual (${catalog.itemCount} item)',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            formatRupiah(catalog.total),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        formatRupiah(catalog.total),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -745,8 +767,12 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
+enum PaymentMethod { wallet, cash }
+
 class _PaymentScreenState extends State<PaymentScreen> {
   final payment = TextEditingController();
+  PaymentMethod selectedMethod = PaymentMethod.wallet;
+  static const walletBalance = 100000;
 
   @override
   void dispose() {
@@ -754,13 +780,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
+  int get typedAmount =>
+      int.tryParse(payment.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
   @override
   Widget build(BuildContext context) {
     final total = widget.catalog.total;
-    final paid = int.tryParse(
-          payment.text.replaceAll(RegExp(r'[^0-9]'), ''),
-        ) ??
-        0;
+    final paid = selectedMethod == PaymentMethod.wallet
+        ? total
+        : typedAmount;
+    final canPay = selectedMethod == PaymentMethod.wallet
+        ? walletBalance >= total
+        : paid >= total;
 
     return Scaffold(
       appBar: AppBar(
@@ -769,87 +800,214 @@ class _PaymentScreenState extends State<PaymentScreen> {
         surfaceTintColor: cream,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
         children: [
           const Text(
             'Ringkasan pembelian',
             style: TextStyle(
-              fontSize: 25,
+              fontSize: 27,
               fontWeight: FontWeight.w700,
               color: ink,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Periksa total dan pilih cara pembayaranmu.',
+            style: TextStyle(color: ink.withOpacity(.65), fontSize: 15),
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x12000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                summaryRow('Total transaksi', formatRupiah(total)),
-                const Divider(height: 28),
-                TextField(
-                  controller: payment,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Jumlah pembayaran',
-                    prefixText: 'Rp ',
+                Text(
+                  'Total yang harus dibayar',
+                  style: TextStyle(color: ink.withOpacity(.65)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  formatRupiah(total),
+                  style: const TextStyle(
+                    color: ink,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 18),
+                const Divider(height: 1),
+                const SizedBox(height: 20),
+                const Text(
+                  'Metode pembayaran',
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                paymentOption(
+                  method: PaymentMethod.wallet,
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Saldo Rupa Rempah',
+                  subtitle: 'Tersedia ${formatRupiah(walletBalance)}',
+                ),
+                const SizedBox(height: 10),
+                paymentOption(
+                  method: PaymentMethod.cash,
+                  icon: Icons.payments_outlined,
+                  title: 'Tunai',
+                  subtitle: 'Masukkan nominal pembayaran',
+                ),
+                if (selectedMethod == PaymentMethod.cash) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: payment,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Nominal tunai',
+                      hintText: 'Contoh: 100000',
+                      prefixText: 'Rp ',
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
                 summaryRow(
-                  'Kembalian',
-                  paid >= total ? formatRupiah(paid - total) : 'Belum cukup',
+                  selectedMethod == PaymentMethod.wallet
+                      ? 'Sisa saldo'
+                      : 'Kembalian',
+                  selectedMethod == PaymentMethod.wallet
+                      ? walletBalance >= total
+                          ? formatRupiah(walletBalance - total)
+                          : 'Saldo tidak cukup'
+                      : paid >= total
+                          ? formatRupiah(paid - total)
+                          : 'Masih kurang ${formatRupiah(total - paid)}',
+                  valueColor: canPay ? leaf : const Color(0xFFB84A3B),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          FilledButton(
-            onPressed: paid >= total
-                ? () {
-                    widget.catalog.clear();
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Pembayaran berhasil'),
-                        content: const Text(
-                          'Terima kasih sudah berbelanja di Rupa Rempah.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.popUntil(
-                              context,
-                              (route) => route.isFirst,
-                            ),
-                            child: const Text('Selesai'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                : null,
-            child: const Text('Konfirmasi pembayaran'),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: canPay ? completePayment : null,
+            icon: const Icon(Icons.lock_outline, size: 19),
+            label: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 2),
+              child: Text('Konfirmasi pembayaran'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget summaryRow(String label, String value) {
+  Widget paymentOption({
+    required PaymentMethod method,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final selected = selectedMethod == method;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$title, $subtitle',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => setState(() => selectedMethod = method),
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFEAF1DD) : const Color(0xFFF8F8F5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? leaf : const Color(0xFFE2E5DE),
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: selected ? leaf : ink.withOpacity(.65)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: ink.withOpacity(.62), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected ? leaf : ink.withOpacity(.35),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completePayment() {
+    widget.catalog.clear();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Pembayaran berhasil'),
+        content: const Text('Terima kasih sudah berbelanja di Rupa Rempah.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.popUntil(
+              context,
+              (route) => route.isFirst,
+            ),
+            child: const Text('Selesai'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget summaryRow(String label, String value, {required Color valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: TextStyle(color: ink.withOpacity(.65))),
-        Text(
-          value,
-          style: const TextStyle(
-            color: ink,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
